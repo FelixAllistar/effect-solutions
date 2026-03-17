@@ -17,6 +17,7 @@ const TARGET_MAP = {
   "darwin-x64": "effect-solutions-darwin-x64",
   "linux-x64": "effect-solutions-linux-x64",
   "linux-arm64": "effect-solutions-linux-arm64",
+  "win32-x64": "effect-solutions-windows-x64.exe",
 }
 
 const binaryName = TARGET_MAP[PLATFORM_ARCH]

@@ -7,6 +7,10 @@ const targets = [
     outfile: "dist/effect-solutions-linux-x64",
   },
   { target: "bun-linux-arm64", outfile: "dist/effect-solutions-linux-arm64" },
+  {
+    target: "bun-windows-x64-baseline",
+    outfile: "dist/effect-solutions-windows-x64.exe",
+  },
 ]
 
 for (const { target, outfile } of targets) {
