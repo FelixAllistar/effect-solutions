@@ -93,12 +93,10 @@ async function main() {
   // Shared prelude so snippets can rely on common imports without cluttering docs
   const prelude = `
 /// <reference types="@effect/vitest/globals" />
-import { Effect, Schema, Context, Layer, Config, ConfigError, Console, Option, Match, Redacted } from "effect";
-import { Args, Command, Options } from "@effect/cli";
-import { HttpClient, HttpClientResponse } from "@effect/platform";
-import { FetchHttpClient } from "@effect/platform/FetchHttpClient";
-import { BunContext, BunRuntime } from "@effect/platform-bun";
-export const __prelude = { Effect, Schema, Context, Layer, Config, ConfigError, Console, Option, Match, Redacted, Args, Command, Options, HttpClient, HttpClientResponse, FetchHttpClient, BunContext, BunRuntime };
+import { Effect, Schema, Layer, Config, ConfigError, Console, Option, Match, Redacted, HttpClient, HttpClientResponse, FetchHttpClient } from "effect";
+import { Argument, Command, Flag } from "effect/unstable/cli";
+import { BunRuntime, BunServices } from "@effect/platform-bun";
+export const __prelude = { Effect, Schema, Layer, Config, ConfigError, Console, Option, Match, Redacted, Argument, Command, Flag, HttpClient, HttpClientResponse, FetchHttpClient, BunRuntime, BunServices };
 `
   await writeFile(join(TEMP_DIR, "prelude.ts"), prelude)
 

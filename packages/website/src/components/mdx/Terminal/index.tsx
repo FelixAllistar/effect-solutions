@@ -1,6 +1,7 @@
 "use client"
 
-import { KeyValueStore } from "@effect/platform/KeyValueStore"
+import { KeyValueStore } from "effect/unstable/persistence"
+import type { KeyValueStore as KVS } from "effect/unstable/persistence"
 import { BrowserKeyValueStore } from "@effect/platform-browser"
 import { Effect } from "effect"
 import { AnimatePresence, motion } from "motion/react"
@@ -281,7 +282,7 @@ export function TerminalDemo() {
       setHistory([])
       // Clear storage via KeyValueStore
       Effect.gen(function* () {
-        const kv = yield* KeyValueStore
+        const kv: KVS.KeyValueStore = yield* KeyValueStore.KeyValueStore
         yield* kv.remove(STORAGE_KEY)
         yield* kv.remove(INITIALIZED_KEY)
       }).pipe(Effect.provide(BrowserKeyValueStore.layerLocalStorage), Effect.runPromise)

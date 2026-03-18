@@ -1,20 +1,20 @@
 import { spawn } from "bun"
-import { Context, Effect, Layer, Schema } from "effect"
+import { Effect, Layer, Schema, ServiceMap } from "effect"
 
-export const OpenIssueCategory = Schema.Literal("Topic Request", "Fix", "Improvement")
+export const OpenIssueCategory = Schema.Literals(["Topic Request", "Fix", "Improvement"])
 export type OpenIssueCategory = typeof OpenIssueCategory.Type
 
-class BrowserOpenError extends Schema.TaggedError<BrowserOpenError>()("BrowserOpenError", {
+class BrowserOpenError extends Schema.TaggedErrorClass("BrowserOpenError")("BrowserOpenError", {
   url: Schema.String,
   cause: Schema.Defect,
 }) {}
 
-export class BrowserService extends Context.Tag("@cli/BrowserService")<
+export class BrowserService extends ServiceMap.Service<
   BrowserService,
   {
     readonly open: (url: string) => Effect.Effect<void, BrowserOpenError>
   }
->() {
+>()("@cli/BrowserService") {
   static readonly layer = Layer.sync(BrowserService, () => {
     const open = Effect.fn("BrowserService.open")((url: string) =>
       Effect.try({
@@ -37,7 +37,7 @@ export class BrowserService extends Context.Tag("@cli/BrowserService")<
           void child.exited
         },
         catch: (error) =>
-          BrowserOpenError.make({
+          new BrowserOpenError({
             url,
             cause: error,
           }),
@@ -76,12 +76,12 @@ export type OpenIssueResult = {
   issueUrl: string
 }
 
-export class IssueService extends Context.Tag("@cli/IssueService")<
+export class IssueService extends ServiceMap.Service<
   IssueService,
   {
     readonly open: (input: OpenIssueInput) => Effect.Effect<OpenIssueResult, BrowserOpenError>
   }
->() {
+>()("@cli/IssueService") {
   static readonly layer = Layer.effect(
     IssueService,
     Effect.gen(function* () {

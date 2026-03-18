@@ -27,6 +27,7 @@ Add the plugin to `tsconfig.json`:
 
 ```json
 {
+  "$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json",
   "compilerOptions": {
     "plugins": [
       {
@@ -37,9 +38,15 @@ Add the plugin to `tsconfig.json`:
 }
 ```
 
-### VS Code Setup
+The `$schema` field enables autocomplete and validation for plugin options in your editor.
 
-For VS Code or any VS Code fork (Cursor, etc.):
+For monorepos, install in the root and configure in the root `tsconfig.json`.
+
+### Editor Setup
+
+Your editor must use the **workspace** TypeScript version (not its built-in one) for the plugin to load.
+
+**VS Code / Cursor:**
 
 1. Add to `.vscode/settings.json`:
 
@@ -52,6 +59,12 @@ For VS Code or any VS Code fork (Cursor, etc.):
 
 2. Press F1 → "TypeScript: Select TypeScript version"
 3. Choose "Use workspace version"
+
+**JetBrains (WebStorm, IntelliJ):** Select the workspace TypeScript version in Settings → Languages & Frameworks → TypeScript.
+
+**NVim (vtsls):** See [how to enable TypeScript plugins in vtsls](https://github.com/yioneko/vtsls?tab=readme-ov-file#typescript-plugin-not-activated).
+
+**Emacs:** See [step-by-step instructions](https://gosha.net/2025/effect-ls-emacs/).
 
 ### Enable Build-Time Diagnostics
 
@@ -73,16 +86,22 @@ Add to `package.json` to persist across installs:
 
 ## Reference Repositories
 
-We recommend cloning the Effect repository (and other complex dependencies you work with often) locally. Your AI agent can then grep through real source code, patterns, and documentation to resolve complex problems.
+We recommend cloning the Effect source locally so your AI agent can grep through real implementations, type definitions, and patterns.
 
-Clone it wherever makes sense for you: a dedicated open source directory, or a shared location like `~/.local/share/effect-solutions/effect` (which the agent-guided setup uses to share across projects).
+The v4 source lives in [`Effect-TS/effect-smol`](https://github.com/Effect-TS/effect-smol). Clone it to a shared location to avoid re-cloning per project:
 
-Once cloned, add a reference in `CLAUDE.md` or `AGENTS.md`:
+```bash
+git clone --depth 1 https://github.com/Effect-TS/effect-smol.git ~/.local/share/effect-solutions/effect
+```
+
+To update later: `git -C ~/.local/share/effect-solutions/effect pull --depth 1`
+
+Then add a reference in `CLAUDE.md` or `AGENTS.md`:
 ```markdown
 ## Local Effect Source
 
-The Effect repository is cloned to `~/.local/share/effect-solutions/effect` for reference. 
-Use this to explore APIs, find usage examples, and understand implementation 
+The Effect v4 repository is cloned to `~/.local/share/effect-solutions/effect` for reference.
+Use this to explore APIs, find usage examples, and understand implementation
 details when the documentation isn't enough.
 ```
 

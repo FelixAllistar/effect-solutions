@@ -79,6 +79,8 @@ Effect projects benefit from strict TypeScript configuration.
 ]
 ```
 
+Add `"$schema": "https://raw.githubusercontent.com/Effect-TS/language-service/refs/heads/main/schema.json"` at the top level of your `tsconfig.json` for autocomplete and validation of plugin options.
+
 Enables Effect language service for editor diagnostics. For build-time diagnostics, run `bunx effect-language-service patch` (see [Project Setup](./01-project-setup.md)).
 
 ## Why These Settings?

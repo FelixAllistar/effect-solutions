@@ -1,12 +1,11 @@
 #!/usr/bin/env bun
 
-import { Args, Command as CliCommand, Options } from "@effect/cli"
-import { BunContext, BunRuntime } from "@effect/platform-bun"
+import { Argument, Command as CliCommand, Flag } from "effect/unstable/cli"
+import { BunRuntime, BunServices } from "@effect/platform-bun"
 import { Console, Effect, Layer, Option, pipe } from "effect"
 import pc from "picocolors"
 import pkg from "../package.json" with { type: "json" }
 import { DOC_LOOKUP, DOCS } from "./docs-manifest"
-import { EffectSolutionsService, GitService } from "./effect-solutions-service"
 import { BrowserService, IssueService, type OpenIssueCategory } from "./open-issue-service"
 import { UpdateNotifier, UpdateNotifierConfig } from "./update-notifier"
 
@@ -111,7 +110,7 @@ export const renderDocs = (requested: ReadonlyArray<string>) => {
 const listDocs = Console.log(renderDocList())
 
 const showDocs = (slugs: ReadonlyArray<string>) =>
-  Effect.try(() => renderDocs(slugs)).pipe(Effect.flatMap((output) => Console.log(output)))
+  Effect.sync(() => renderDocs(slugs)).pipe(Effect.flatMap((output) => Console.log(output)))
 
 const listCommand = CliCommand.make("list").pipe(
   CliCommand.withDescription("List Effect Solutions documentation"),
@@ -119,9 +118,9 @@ const listCommand = CliCommand.make("list").pipe(
 )
 
 const showCommand = CliCommand.make("show", {
-  slugs: Args.text({ name: "slug" }).pipe(
-    Args.withDescription("Doc slug(s) to display (e.g., error-handling, services)"),
-    Args.atLeast(1),
+  slugs: Argument.string("slug").pipe(
+    Argument.withDescription("Doc slug(s) to display (e.g., error-handling, services)"),
+    Argument.atLeast(1),
   ),
 }).pipe(
   CliCommand.withDescription("Show one or more Effect Solutions docs"),
@@ -129,14 +128,14 @@ const showCommand = CliCommand.make("show", {
 )
 
 const openIssueCommand = CliCommand.make("open-issue", {
-  category: Options.text("category").pipe(
-    Options.withDescription("Issue category: 'Topic Request', 'Fix', or 'Improvement'"),
-    Options.optional,
+  category: Flag.string("category").pipe(
+    Flag.withDescription("Issue category: 'Topic Request', 'Fix', or 'Improvement'"),
+    Flag.optional,
   ),
-  title: Options.text("title").pipe(Options.withDescription("Brief issue title"), Options.optional),
-  description: Options.text("description").pipe(
-    Options.withDescription("Detailed issue description"),
-    Options.optional,
+  title: Flag.string("title").pipe(Flag.withDescription("Brief issue title"), Flag.optional),
+  description: Flag.string("description").pipe(
+    Flag.withDescription("Detailed issue description"),
+    Flag.optional,
   ),
 }).pipe(
   CliCommand.withDescription("Open a pre-filled GitHub issue in the effect-solutions repo"),
@@ -153,7 +152,7 @@ const openIssueCommand = CliCommand.make("open-issue", {
       }
 
       const result = yield* issueService.open(input).pipe(
-        Effect.catchAll((error) =>
+        Effect.catch((error) =>
           Effect.gen(function* () {
             yield* Console.error(pc.red(`Failed to open issue: ${error.message}`))
             return { issueUrl: error.url }
@@ -168,53 +167,23 @@ const openIssueCommand = CliCommand.make("open-issue", {
   ),
 )
 
-const setupCommand = CliCommand.make("setup").pipe(
-  CliCommand.withDescription("Set up local Effect source reference for AI agents (.reference/effect/)"),
-  CliCommand.withHandler(() =>
-    Effect.gen(function* () {
-      const service = yield* EffectSolutionsService
-      const cwd = process.cwd()
-
-      yield* Console.log(pc.cyan("Setting up Effect source reference..."))
-
-      const result = yield* service.setup(cwd)
-
-      if (result.created) {
-        yield* Console.log(pc.green("Created .reference/effect/ with Effect source."))
-      } else {
-        yield* Console.log(pc.green("Updated Effect source reference."))
-      }
-
-      if (result.gitignoreUpdated) {
-        yield* Console.log(pc.green("Added .reference/ to .gitignore"))
-      }
-
-      yield* Console.log(
-        `\n${pc.bold("Done!")} AI agents can now search ${pc.cyan("./.reference/effect/")} for real Effect implementations.`,
-      )
-    }),
-  ),
-)
-
 export const cli = CliCommand.make(CLI_NAME).pipe(
   CliCommand.withDescription(
     "Effect Solutions CLI - Browse Effect best practices documentation. " +
       "Built for both humans and AI agents to quickly access Effect patterns, setup guides, and configuration examples.",
   ),
-  CliCommand.withSubcommands([listCommand, showCommand, openIssueCommand, setupCommand]),
+  CliCommand.withSubcommands([listCommand, showCommand, openIssueCommand]),
 )
 
 export const runCli = (argv: ReadonlyArray<string>) =>
-  CliCommand.run(cli, {
-    name: CLI_NAME,
+  CliCommand.runWith(cli, {
     version: CLI_VERSION,
   })(argv)
 
 const MainLayer = UpdateNotifier.layer.pipe(
   Layer.provide(UpdateNotifierConfig.layer),
   Layer.merge(IssueService.layer.pipe(Layer.provide(BrowserService.layer))),
-  Layer.merge(EffectSolutionsService.layer.pipe(Layer.provide(GitService.layer))),
-  Layer.provideMerge(BunContext.layer),
+  Layer.provideMerge(BunServices.layer),
 )
 
 if (import.meta.main) {
@@ -222,11 +191,15 @@ if (import.meta.main) {
     Effect.gen(function* () {
       const notifier = yield* UpdateNotifier
       yield* notifier.check(CLI_NAME, CLI_VERSION)
-      yield* runCli(process.argv)
+      // In dev mode (bun src/cli.ts args...), argv has 2 prefix elements.
+      // In compiled binary mode (./effect-solutions args...), argv has 1.
+      // Detect by checking if argv[1] looks like a script path.
+      const prefixLen = process.argv[1]?.match(/\.(ts|js|mjs)$/) ? 2 : 1
+      yield* runCli(process.argv.slice(prefixLen))
     }),
     Effect.provide(MainLayer),
-    Effect.tapErrorCause((cause) => Console.error(pc.red(`Error: ${cause}`))),
-    Effect.catchAll(() => Effect.sync(() => process.exit(1))),
+    Effect.tapError((error) => Console.error(pc.red(`Error: ${error}`))),
+    Effect.catch(() => Effect.sync(() => process.exit(1))),
     BunRuntime.runMain,
   )
 }

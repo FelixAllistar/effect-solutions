@@ -1,7 +1,7 @@
 import { mkdir, readFile, writeFile } from "node:fs/promises"
 import os from "node:os"
 import path from "node:path"
-import { Console, Context, Effect, Layer, Option, Schema } from "effect"
+import { Console, Effect, Layer, Option, Schema, ServiceMap } from "effect"
 
 const CacheFile = Schema.Struct({
   latest: Schema.String,
@@ -9,16 +9,16 @@ const CacheFile = Schema.Struct({
 })
 type CacheFile = typeof CacheFile.Type
 
-class UpdateCheckError extends Schema.TaggedError<UpdateCheckError>()("UpdateCheckError", {
+class UpdateCheckError extends Schema.TaggedErrorClass("UpdateCheckError")("UpdateCheckError", {
   cause: Schema.Defect,
 }) {}
 
-export class UpdateNotifier extends Context.Tag("@cli/UpdateNotifier")<
+export class UpdateNotifier extends ServiceMap.Service<
   UpdateNotifier,
   {
     readonly check: (pkgName: string, currentVersion: string) => Effect.Effect<void, UpdateCheckError>
   }
->() {
+>()("@cli/UpdateNotifier") {
   static readonly layer = Layer.effect(
     UpdateNotifier,
     Effect.gen(function* () {
@@ -50,7 +50,7 @@ export class UpdateNotifier extends Context.Tag("@cli/UpdateNotifier")<
                 })
               : Effect.succeed(Option.none()),
           ),
-          Effect.catchAll(() => Effect.succeed(Option.none())),
+          Effect.catch(() => Effect.succeed(Option.none())),
         ),
       )
 
@@ -61,7 +61,7 @@ export class UpdateNotifier extends Context.Tag("@cli/UpdateNotifier")<
             await writeFile(file, JSON.stringify(data), "utf8")
           },
           catch: () => {},
-        }).pipe(Effect.catchAll(() => Effect.void)),
+        }).pipe(Effect.catch(() => Effect.void)),
       )
 
       const fetchLatest = Effect.fn("UpdateNotifier.fetchLatest")((pkgName: string) =>
@@ -81,7 +81,7 @@ export class UpdateNotifier extends Context.Tag("@cli/UpdateNotifier")<
             }
           },
           catch: () => Option.none<string>(),
-        }).pipe(Effect.catchAll(() => Effect.succeed(Option.none()))),
+        }).pipe(Effect.catch(() => Effect.succeed(Option.none()))),
       )
 
       const logUpdate = Effect.fn("UpdateNotifier.logUpdate")((current: string, latest: string, pkgName: string) =>
@@ -120,7 +120,7 @@ export class UpdateNotifier extends Context.Tag("@cli/UpdateNotifier")<
           if (isNewer(latestVersion, currentVersion)) {
             yield* logUpdate(currentVersion, latestVersion, pkgName)
           }
-        }).pipe(Effect.catchAll(() => Effect.void)),
+        }).pipe(Effect.catch(() => Effect.void)),
       )
 
       return UpdateNotifier.of({ check })
@@ -135,7 +135,7 @@ export class UpdateNotifier extends Context.Tag("@cli/UpdateNotifier")<
   )
 }
 
-export class UpdateNotifierConfig extends Context.Tag("@cli/UpdateNotifierConfig")<
+export class UpdateNotifierConfig extends ServiceMap.Service<
   UpdateNotifierConfig,
   {
     readonly checkInterval: number
@@ -143,7 +143,7 @@ export class UpdateNotifierConfig extends Context.Tag("@cli/UpdateNotifierConfig
     readonly isCi: boolean
     readonly homeDir: string
   }
->() {
+>()("@cli/UpdateNotifierConfig") {
   static readonly layer = Layer.sync(UpdateNotifierConfig, () => {
     const isCi = Boolean(process.env.CI || process.env.NODE_ENV === "test")
     const homeDir = process.env.HOME ?? os.homedir()
