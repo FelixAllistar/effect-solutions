@@ -22,7 +22,7 @@ interface ServerHandle {
 // =============================================================================
 
 /** Find an available port by binding to port 0 */
-const getRandomPort = Effect.async<number>((resume) => {
+const getRandomPort = Effect.callback<number>((resume) => {
   const server = net.createServer()
   server.listen(0, "localhost", () => {
     const address = server.address()
