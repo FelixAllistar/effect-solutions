@@ -126,7 +126,6 @@ The CLI (`packages/cli/`) provides offline access to documentation:
 ```bash
 bunx effect-solutions list          # List all topics
 bunx effect-solutions show <slug>   # Show specific topic (supports multiple)
-bunx effect-solutions setup         # Clone Effect source to .reference/effect/
 bunx effect-solutions open-issue    # Leave feedback
 ```
 
@@ -213,7 +212,7 @@ Effect-based CLI using:
 
 1. Run `effect-solutions list` to see available guides
 2. Run `effect-solutions show <topic>...` for relevant patterns (supports multiple topics)
-3. Search `.reference/effect/` for real implementations (run `effect-solutions setup` first)
+3. Search `~/.local/share/effect-solutions/effect` for real implementations
 
 Topics: quick-start, project-setup, tsconfig, basics, services-and-layers, data-modeling, error-handling, config, testing, cli.
 

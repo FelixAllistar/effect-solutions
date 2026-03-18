@@ -1,5 +1,5 @@
-import { Args, Command, Options } from "@effect/cli"
-import { Cause, Console, Effect, Exit, Option } from "effect"
+import { Argument, Command, Flag } from "effect/unstable/cli"
+import { Console, Effect, Exit, Layer, Option } from "effect"
 import { TaskId, TaskRepo } from "./domain"
 import { BrowserRuntime, log, MockTerminalLayer, makeMockConsole, TerminalOutput, TerminalOutputLive } from "./services"
 
@@ -8,7 +8,7 @@ import { BrowserRuntime, log, MockTerminalLayer, makeMockConsole, TerminalOutput
 // =============================================================================
 
 // add <task>
-const textArg = Args.text({ name: "task" }).pipe(Args.withDescription("The task description"))
+const textArg = Argument.string("task").pipe(Argument.withDescription("The task description"))
 
 const addCommand = Command.make("add", { text: textArg }, ({ text }) =>
   Effect.gen(function* () {
@@ -19,9 +19,9 @@ const addCommand = Command.make("add", { text: textArg }, ({ text }) =>
 ).pipe(Command.withDescription("Add a new task"))
 
 // list [--all]
-const allOption = Options.boolean("all").pipe(
-  Options.withAlias("a"),
-  Options.withDescription("Show all tasks including completed"),
+const allOption = Flag.boolean("all").pipe(
+  Flag.withAlias("a"),
+  Flag.withDescription("Show all tasks including completed"),
 )
 
 const listCommand = Command.make("list", { all: allOption }, ({ all }) =>
@@ -43,7 +43,7 @@ const listCommand = Command.make("list", { all: allOption }, ({ all }) =>
 ).pipe(Command.withDescription("List pending tasks"))
 
 // toggle <id>
-const idArg = Args.integer({ name: "id" }).pipe(Args.withSchema(TaskId), Args.withDescription("The task ID to toggle"))
+const idArg = Argument.integer("id").pipe(Argument.withSchema(TaskId), Argument.withDescription("The task ID to toggle"))
 
 const toggleCommand = Command.make("toggle", { id: idArg }, ({ id }) =>
   Effect.gen(function* () {
@@ -75,8 +75,7 @@ export const app = Command.make("tasks", {}).pipe(
   Command.withSubcommands([addCommand, listCommand, toggleCommand, clearCommand]),
 )
 
-export const cli = Command.run(app, {
-  name: "tasks",
+export const cli = Command.runWith(app, {
   version: "1.0.0",
 })
 
@@ -122,29 +121,22 @@ export async function runCliCommand(args: string): Promise<CliResult> {
 
   // Create a fresh output accumulator per command
   const program = Effect.gen(function* () {
-    // Create mock console and use Console.setConsole to override default
+    // Create mock console and override the default Console reference
     const mockConsole = yield* makeMockConsole
-    const consoleLayer = Console.setConsole(mockConsole)
+    const consoleLayer = Layer.succeed(Console.Console, mockConsole)
 
     // Run the CLI command with mock console
     const exit = yield* cli(argv).pipe(Effect.provide(consoleLayer), Effect.provide(MockTerminalLayer), Effect.exit)
 
     // Retrieve output from the accumulator
-    const output = (yield* TerminalOutput.pipe(Effect.flatMap((out) => out.getLines))).join("\n")
+    const termOutput = yield* TerminalOutput
+    const lines = yield* termOutput.getLines
+    const output = lines.join("\n")
 
     if (Exit.isFailure(exit)) {
       // If we have captured output, show it (e.g. help text or errors)
       if (output) {
         return { output, isError: true }
-      }
-      // Extract error message from CLI validation errors
-      const maybeError = Cause.failureOption(exit.cause)
-      if (Option.isSome(maybeError)) {
-        const err = maybeError.value as {
-          error?: { value?: { value?: string } }
-        }
-        const msg = err.error?.value?.value ?? String(maybeError.value)
-        return { output: msg, isError: true }
       }
       return { output: String(exit.cause), isError: true }
     }

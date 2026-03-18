@@ -1,9 +1,9 @@
-import * as FileSystem from "@effect/platform/FileSystem"
-import { KeyValueStore } from "@effect/platform/KeyValueStore"
-import * as Path from "@effect/platform/Path"
-import { Terminal } from "@effect/platform/Terminal"
+import { KeyValueStore } from "effect/unstable/persistence"
+import { Terminal, Stdio } from "effect"
+import { FileSystem, Path } from "effect"
+import { ChildProcessSpawner } from "effect/unstable/process"
 import { BrowserKeyValueStore } from "@effect/platform-browser"
-import { Console, Context, Effect, Layer, ManagedRuntime, Option, Ref } from "effect"
+import { Console, Effect, Layer, ManagedRuntime, Option, Ref, ServiceMap } from "effect"
 import { Task, TaskId, TaskList, TaskRepo } from "./domain"
 
 // =============================================================================
@@ -13,15 +13,15 @@ import { Task, TaskId, TaskList, TaskRepo } from "./domain"
 const STORAGE_KEY = "effect-solutions-tasks-demo"
 const INITIALIZED_KEY = "effect-solutions-tasks-initialized"
 
-const DEFAULT_TASKS = TaskList.make({
+const DEFAULT_TASKS = new TaskList({
   tasks: [
-    Task.make({
-      id: TaskId.make(1),
+    new Task({
+      id: TaskId.makeUnsafe(1),
       text: "Run the agent-guided setup",
       done: false,
     }),
-    Task.make({
-      id: TaskId.make(2),
+    new Task({
+      id: TaskId.makeUnsafe(2),
       text: "Become effect-pilled",
       done: false,
     }),
@@ -31,7 +31,7 @@ const DEFAULT_TASKS = TaskList.make({
 const browserTaskRepoLayer = Layer.effect(
   TaskRepo,
   Effect.gen(function* () {
-    const kv = (yield* KeyValueStore).forSchema(TaskList)
+    const kv = KeyValueStore.toSchemaStore(yield* KeyValueStore.KeyValueStore, TaskList)
 
     const loadTaskList = Effect.gen(function* () {
       const initialized = yield* kv.has(INITIALIZED_KEY)
@@ -74,27 +74,30 @@ const browserTaskRepoLayer = Layer.effect(
 // Terminal Output Service (line accumulator)
 // =============================================================================
 
-export class TerminalOutput extends Context.Tag("TerminalOutput")<
+export class TerminalOutput extends ServiceMap.Service<
   TerminalOutput,
   {
     readonly log: (...args: ReadonlyArray<unknown>) => Effect.Effect<void>
+    readonly logSync: (...args: ReadonlyArray<unknown>) => void
     readonly getLines: Effect.Effect<ReadonlyArray<string>>
   }
->() {}
+>()("TerminalOutput") {}
 
-export const TerminalOutputLive = Layer.effect(
-  TerminalOutput,
-  Effect.gen(function* () {
-    const lines = yield* Ref.make<string[]>([])
-    return {
-      log: (...args) => Ref.update(lines, (l) => [...l, ...args.map(String)]),
-      getLines: Ref.get(lines),
-    }
-  }),
-)
+export const TerminalOutputLive = Layer.sync(TerminalOutput, () => {
+  const lines: string[] = []
+  return TerminalOutput.of({
+    log: (...args) => Effect.sync(() => { for (const a of args) lines.push(String(a)) }),
+    logSync: (...args) => { for (const a of args) lines.push(String(a)) },
+    getLines: Effect.sync(() => [...lines]),
+  })
+})
 
 // Helper to log to TerminalOutput
-export const log = (...args: ReadonlyArray<unknown>) => Effect.flatMap(TerminalOutput, (out) => out.log(...args))
+export const log = (...args: ReadonlyArray<unknown>) =>
+  Effect.gen(function* () {
+    const out = yield* TerminalOutput
+    yield* out.log(...args)
+  })
 
 // =============================================================================
 // Mock Platform Services (minimal browser stubs)
@@ -102,12 +105,15 @@ export const log = (...args: ReadonlyArray<unknown>) => Effect.flatMap(TerminalO
 
 // Terminal mock - display goes to our TerminalOutput accumulator
 export const MockTerminalLayer = Layer.effect(
-  Terminal,
+  Terminal.Terminal,
   Effect.gen(function* () {
     const output = yield* TerminalOutput
-    return Terminal.of({
+    return Terminal.make({
       columns: Effect.succeed(80),
-      display: (text: string) => output.log(text),
+      display: (text: string) =>
+        Effect.gen(function* () {
+          yield* output.log(text)
+        }),
       readLine: Effect.die("readLine not implemented in browser"),
       readInput: Effect.die("readInput not implemented in browser"),
     })
@@ -115,22 +121,22 @@ export const MockTerminalLayer = Layer.effect(
 )
 
 // Console mock - @effect/cli uses Console.log/error for help and error output
-// Must use Console.setConsole to properly override the default console
-const noop = () => Effect.void
-export const makeMockConsole = Effect.map(TerminalOutput, (output) =>
-  Console.Console.of({
-    [Console.TypeId]: Console.TypeId,
-    log: (...args) => output.log(...args),
-    error: (...args) => output.log(...args),
+const noop = () => {}
+export const makeMockConsole = Effect.gen(function* () {
+  const output = yield* TerminalOutput
+  return {
+    log: (...args: any[]) => output.logSync(...args),
+    error: (...args: any[]) => output.logSync(...args),
     assert: noop,
-    clear: Effect.void,
+    clear: noop,
     count: noop,
     countReset: noop,
     debug: noop,
     dir: noop,
     dirxml: noop,
     group: noop,
-    groupEnd: Effect.void,
+    groupCollapsed: noop,
+    groupEnd: noop,
     info: noop,
     table: noop,
     time: noop,
@@ -138,9 +144,8 @@ export const makeMockConsole = Effect.map(TerminalOutput, (output) =>
     timeLog: noop,
     trace: noop,
     warn: noop,
-    unsafe: globalThis.console,
-  }),
-)
+  } satisfies Console.Console
+})
 
 // FileSystem.layerNoop provides a no-op FileSystem where all operations fail by default
 const mockFileSystemLayer = FileSystem.layerNoop({})
@@ -148,8 +153,17 @@ const mockFileSystemLayer = FileSystem.layerNoop({})
 // Path.layer is a built-in cross-platform Path implementation that works in browsers
 const mockPathLayer = Path.layer
 
+// Stub layers for CLI Environment requirements not needed in browser
+const mockStdioLayer = Stdio.layerTest({})
+const mockSpawnerLayer = Layer.succeed(
+  ChildProcessSpawner.ChildProcessSpawner,
+  ChildProcessSpawner.make(
+    () => Effect.die("ChildProcessSpawner not available in browser"),
+  ),
+)
+
 // Combined browser platform layer (without Terminal - that needs TerminalOutput)
-const browserPlatformLayer = Layer.mergeAll(mockFileSystemLayer, mockPathLayer)
+const browserPlatformLayer = Layer.mergeAll(mockFileSystemLayer, mockPathLayer, mockStdioLayer, mockSpawnerLayer)
 
 // Combined layer for all browser services
 const browserLiveLayer = Layer.mergeAll(browserPlatformLayer, browserTaskRepoLayer)

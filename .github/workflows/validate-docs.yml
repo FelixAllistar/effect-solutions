@@ -2,8 +2,8 @@ name: Validate Documentation
 
 on:
   schedule:
-    # Run weekly on Mondays at midnight UTC
-    - cron: '0 0 * * 1'
+    # Run biweekly on the 1st and 15th at midnight UTC
+    - cron: '0 0 1,15 * *'
   workflow_dispatch:
 
 jobs:

@@ -103,7 +103,7 @@ These tell AI assistants about project tools.
 
 1. Run \`effect-solutions list\` to see available guides
 2. Run \`effect-solutions show <topic>...\` for relevant patterns (supports multiple topics)
-3. Search \`.reference/effect/\` for real implementations (run \`effect-solutions setup\` first)
+3. Search \`~/.local/share/effect-solutions/effect\` for real implementations
 
 Topics: quick-start, project-setup, tsconfig, basics, services-and-layers, data-modeling, error-handling, config, testing, cli.
 
@@ -114,13 +114,19 @@ Never guess at Effect patterns - check the guide first.
 
 ## Set Up Effect Source Reference
 
-Run \`effect-solutions setup\` in the project root. This:
-- Clones the Effect monorepo to \`.reference/effect/\` (shallow clone)
-- Adds \`.reference/\` to \`.gitignore\`
+Clone the Effect v4 source repository to a shared location so AI agents can search real implementations:
 
-**If \`.reference/effect/\` already exists:** Running setup again will pull the latest changes.
+\`\`\`bash
+git clone --depth 1 https://github.com/Effect-TS/effect-smol.git ~/.local/share/effect-solutions/effect
+\`\`\`
 
-**Why this matters:** AI agents can search \`.reference/effect/\` for real Effect implementations, type definitions, and patterns when documentation isn't enough.
+If the directory already exists, pull the latest changes:
+
+\`\`\`bash
+git -C ~/.local/share/effect-solutions/effect pull --depth 1
+\`\`\`
+
+**Why this matters:** AI agents can search \`~/.local/share/effect-solutions/effect\` for real Effect implementations, type definitions, and patterns when documentation isn't enough. Using a shared location avoids re-cloning per project.
 
 ---
 

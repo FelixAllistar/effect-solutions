@@ -1,5 +1,4 @@
-import { Context, type Effect, Option, Schema } from "effect"
-import * as Arr from "effect/Array"
+import { type Effect, Option, Schema, ServiceMap } from "effect"
 
 // =============================================================================
 // Task Schema & Domain
@@ -14,24 +13,24 @@ export class Task extends Schema.Class<Task>("Task")({
   done: Schema.Boolean,
 }) {
   toggle() {
-    return Task.make({ ...this, done: !this.done })
+    return new Task({ ...this, done: !this.done })
   }
 }
 
 export class TaskList extends Schema.Class<TaskList>("TaskList")({
   tasks: Schema.Array(Task),
 }) {
-  static Json = Schema.parseJson(TaskList)
-  static empty = TaskList.make({ tasks: [] })
+  static Json = Schema.fromJsonString(TaskList)
+  static empty = new TaskList({ tasks: [] })
 
   get nextId(): TaskId {
-    if (this.tasks.length === 0) return TaskId.make(1)
-    return TaskId.make(Math.max(...this.tasks.map((t) => t.id)) + 1)
+    if (this.tasks.length === 0) return TaskId.makeUnsafe(1)
+    return TaskId.makeUnsafe(Math.max(...this.tasks.map((t) => t.id)) + 1)
   }
 
   add(text: string): [TaskList, Task] {
-    const task = Task.make({ id: this.nextId, text, done: false })
-    return [TaskList.make({ tasks: [...this.tasks, task] }), task]
+    const task = new Task({ id: this.nextId, text, done: false })
+    return [new TaskList({ tasks: [...this.tasks, task] }), task]
   }
 
   toggle(id: TaskId): [TaskList, Option.Option<Task>] {
@@ -40,8 +39,9 @@ export class TaskList extends Schema.Class<TaskList>("TaskList")({
 
     // biome-ignore lint/style/noNonNullAssertion: index check above
     const updated = this.tasks[index]!.toggle()
-    const tasks = Arr.modify(this.tasks, index, () => updated)
-    return [TaskList.make({ tasks }), Option.some(updated)]
+    const tasks = [...this.tasks]
+    tasks[index] = updated
+    return [new TaskList({ tasks }), Option.some(updated)]
   }
 }
 
@@ -49,7 +49,7 @@ export class TaskList extends Schema.Class<TaskList>("TaskList")({
 // TaskRepo Service
 // =============================================================================
 
-export class TaskRepo extends Context.Tag("TaskRepo")<
+export class TaskRepo extends ServiceMap.Service<
   TaskRepo,
   {
     readonly list: (all?: boolean) => Effect.Effect<ReadonlyArray<Task>>
@@ -57,4 +57,4 @@ export class TaskRepo extends Context.Tag("TaskRepo")<
     readonly toggle: (id: TaskId) => Effect.Effect<Option.Option<Task>>
     readonly clear: () => Effect.Effect<void>
   }
->() {}
+>()("TaskRepo") {}

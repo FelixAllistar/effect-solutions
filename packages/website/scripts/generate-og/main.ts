@@ -1,5 +1,5 @@
 import fs from "node:fs"
-import { BunContext, BunRuntime } from "@effect/platform-bun"
+import { BunServices, BunRuntime } from "@effect/platform-bun"
 import { Console, Effect, Layer } from "effect"
 import { Browser } from "./browser.js"
 import { captureSpec } from "./capture.js"
@@ -34,7 +34,7 @@ const program = Effect.gen(function* () {
 // Layer Composition
 // =============================================================================
 
-const MainLayer = Layer.mergeAll(Browser.layer, TemplateServer.layer).pipe(Layer.provideMerge(BunContext.layer))
+const MainLayer = Layer.mergeAll(Browser.layer, TemplateServer.layer).pipe(Layer.provideMerge(BunServices.layer))
 
 // =============================================================================
 // Run
