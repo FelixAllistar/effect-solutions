@@ -1,5 +1,11 @@
 # effect-solutions
 
+## 0.5.2
+
+### Patch Changes
+
+- [`ec9e8dd`](https://github.com/kitlangton/effect-solutions/commit/ec9e8dd51597c979d1a78df3be4c72bdec677447) Thanks [@kitlangton](https://github.com/kitlangton)! - Fix CLI argv parsing for compiled bun binaries
+
 ## 0.5.1
 
 ### Patch Changes
