@@ -70,6 +70,7 @@ const startDevServer = Effect.gen(function* () {
   const handle = yield* ChildProcess.make("bunx", ["next", "dev", "--hostname", "127.0.0.1", "--port", String(port)], {
     cwd: process.cwd(),
     env: {
+      ...process.env,
       BROWSER: "none",
       NEXT_CACHE_DIR,
     },
